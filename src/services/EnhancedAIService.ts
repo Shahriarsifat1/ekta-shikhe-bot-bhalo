@@ -33,72 +33,141 @@ interface ExtractedFact {
   context: string;
 }
 
+interface QuestionIntent {
+  type: 'birth_location' | 'death_location' | 'relationship' | 'comparison' | 'explanation' | 'general';
+  confidence: number;
+  keywords: string[];
+  normalizedQuery: string;
+}
+
 class EnhancedAIServiceClass {
   private knowledgeBase: KnowledgeItem[] = [];
   private conversationContext: ConversationContext;
   private fuseInstance: Fuse<KnowledgeItem> | null = null;
 
-  // Enhanced Bengali language processing
-  private bengaliSynonyms: Record<string, string[]> = {
-    'কি': ['কী', 'কেমন', 'কোন', 'কিরকম'],
-    'কী': ['কি', 'কেমন', 'কোন', 'কিরকম'],
-    'কে': ['কার', 'কাকে', 'কাহার', 'কোন ব্যক্তি'],
-    'কেন': ['কিসের জন্য', 'কোন কারণে', 'কি কারণে'],
-    'কিভাবে': ['কেমনে', 'কিরূপে', 'কোন উপায়ে', 'কোন পদ্ধতিতে'],
-    'কোথায়': ['কোন জায়গায়', 'কোন স্থানে', 'কোথাকার'],
-    'কখন': ['কোন সময়', 'কত সময়', 'কোন কালে'],
-    'কত': ['কতটা', 'কেমন', 'কি পরিমাণ'],
-    'জন্মগ্রহণ': ['জন্ম নেওয়া', 'জন্মায়', 'জন্মেছিলেন', 'ভূমিষ্ঠ'],
-    'মৃত্যুবরণ': ['মারা যাওয়া', 'মৃত্যু', 'মরে যান', 'ইন্তেকাল', 'পরলোকগমন'],
-    'বাবা': ['পিতা', 'পিতার', 'বাবার', 'জনক'],
-    'মা': ['মাতা', 'মায়ের', 'মাতার', 'জননী'],
-    'ভালো': ['চমৎকার', 'সুন্দর', 'দারুণ', 'অসাধারণ'],
-    'খারাপ': ['বাজে', 'খারাপ', 'নিম্নমানের', 'দুর্বল']
+  // Comprehensive Bengali word variations and synonyms
+  private comprehensiveBengaliSynonyms: Record<string, string[]> = {
+    // Question words - most comprehensive list
+    'কি': ['কী', 'কেমন', 'কোন', 'কিরকম', 'কিসের', 'কোনটা', 'কিটা', 'কিছু', 'কোন জিনিস'],
+    'কী': ['কি', 'কেমন', 'কোন', 'কিরকম', 'কিসের', 'কোনটা', 'কিটা', 'কিছু', 'কোন জিনিস'],
+    'কে': ['কার', 'কাকে', 'কাহার', 'কোন ব্যক্তি', 'কোন লোক', 'কোন মানুষ', 'কাহাকে'],
+    'কেন': ['কিসের জন্য', 'কোন কারণে', 'কি কারণে', 'কিজন্য', 'কি দরকারে', 'কেনো'],
+    'কিভাবে': ['কেমনে', 'কিরূপে', 'কোন উপায়ে', 'কোন পদ্ধতিতে', 'কি পদ্ধতিতে', 'কেমন করে'],
+    'কোথায়': ['কোন জায়গায়', 'কোন স্থানে', 'কোথাকার', 'কোন এলাকায়', 'কোথাতে', 'কোন দেশে'],
+    'কখন': ['কোন সময়', 'কত সময়', 'কোন কালে', 'কোন তারিখে', 'কোন দিন', 'কবে'],
+    'কত': ['কতটা', 'কেমন', 'কি পরিমাণ', 'কত সংখ্যক', 'কয়টা', 'কতগুলো'],
+    
+    // Birth related terms - more variations
+    'জন্মগ্রহণ': ['জন্ম নেওয়া', 'জন্মায়', 'জন্মেছিলেন', 'ভূমিষ্ঠ', 'জন্ম হয়', 'জন্ম হয়েছিল', 'জন্ম হয়েছে'],
+    'জন্ম': ['জন্মগ্রহণ', 'জন্ম নেওয়া', 'জন্মায়', 'জন্মেছিলেন', 'ভূমিষ্ঠ', 'জন্ম হয়', 'জন্ম হয়েছিল'],
+    'জন্মস্থান': ['জন্মের জায়গা', 'জন্মের স্থান', 'জন্মভূমি', 'জন্ম হয়েছে কোথায়', 'কোথায় জন্ম'],
+    
+    // Death related terms
+    'মৃত্যুবরণ': ['মারা যাওয়া', 'মৃত্যু', 'মরে যান', 'ইন্তেকাল', 'পরলোকগমন', 'মৃত্যু হয়', 'মারা গেছেন'],
+    'মৃত্যু': ['মারা যাওয়া', 'মৃত্যুবরণ', 'মরে যান', 'ইন্তেকাল', 'পরলোকগমন', 'মৃত্যু হয়'],
+    'মারা': ['মৃত্যুবরণ', 'মৃত্যু', 'মরে যান', 'ইন্তেকাল', 'পরলোকগমন', 'মৃত্যু হয়'],
+    
+    // Family relationship terms - comprehensive
+    'বাবা': ['পিতা', 'পিতার', 'বাবার', 'জনক', 'আব্বা', 'বাবাজি', 'আব্বাজান'],
+    'মা': ['মাতা', 'মায়ের', 'মাতার', 'জননী', 'আম্মা', 'মায়ে', 'আম্মাজান'],
+    'স্ত্রী': ['বউ', 'বিবি', 'বেগম', 'পত্নী', 'গৃহিণী', 'বিবাহিতা', 'বিয়ের স্ত্রী'],
+    'স্বামী': ['পতি', 'বর', 'ভর্তা', 'স্বামী', 'বিয়ের স্বামী'],
+    'পুত্র': ['ছেলে', 'বেটা', 'সন্তান', 'সপুত', 'তনয়'],
+    'কন্যা': ['মেয়ে', 'বেটি', 'সন্তান', 'কন্যা সন্তান', 'তনয়া'],
+    
+    // Location terms
+    'গ্রাম': ['পল্লী', 'গ্রাম্য', 'পাড়া', 'মৌজা', 'গঞ্জ'],
+    'শহর': ['নগর', 'নগরী', 'পুর', 'মহানগর', 'পৌর'],
+    'জেলা': ['জিলা', 'জেলার', 'ডিস্ট্রিক্ট'],
+    'বিভাগ': ['ডিভিশন', 'অঞ্চল', 'এলাকা'],
+    
+    // Quality adjectives
+    'ভালো': ['চমৎকার', 'সুন্দর', 'দারুণ', 'অসাধারণ', 'উত্তম', 'চমৎকার', 'বেশ'],
+    'খারাপ': ['বাজে', 'নিম্নমানের', 'দুর্বল', 'অসুন্দর', 'নিম্ন', 'মন্দ'],
+    
+    // Common verbs
+    'বলেন': ['বলুন', 'বলো', 'বল', 'জানান', 'বর্ণনা করুন'],
+    'জানতে': ['বুঝতে', 'শিখতে', 'জানার জন্য', 'বোঝার জন্য'],
+    'চাই': ['চাইতেছি', 'প্রয়োজন', 'দরকার', 'ইচ্ছা', 'আগ্রহ'],
+    
+    // Common connecting words
+    'সম্পর্কে': ['বিষয়ে', 'নিয়ে', 'ব্যাপারে', 'সন্দর্ভে'],
+    'সাথে': ['সঙ্গে', 'সহ', 'সহিত', 'একসাথে'],
+    'থেকে': ['হতে', 'হইতে', 'হয়ে']
   };
 
-  // Enhanced question patterns with emotional context
+  // Advanced question patterns with multiple variations
   private advancedQuestionPatterns = {
     birth_location: {
-      patterns: ['কোথায় জন্মগ্রহণ', 'কোথায় জন্ম', 'জন্মস্থান', 'কোন গ্রামে জন্ম', 'জন্মভূমি'],
+      patterns: [
+        'কোথায় জন্মগ্রহণ', 'কোথায় জন্ম', 'জন্মস্থান', 'কোন গ্রামে জন্ম', 'জন্মভূমি',
+        'জন্ম হয়েছে কোথায়', 'জন্মের স্থান', 'জন্মের জায়গা', 'কোন জায়গায় জন্ম',
+        'জন্ম নিয়েছেন কোথায়', 'ভূমিষ্ঠ হয়েছেন কোথায়'
+      ],
       intent: 'location_inquiry',
       emotion: 'curious'
     },
     death_location: {
-      patterns: ['কোথায় মৃত্যু', 'কোথায় মারা', 'মৃত্যুস্থান', 'শেষ নিঃশ্বাস কোথায়'],
+      patterns: [
+        'কোথায় মৃত্যু', 'কোথায় মারা', 'মৃত্যুস্থান', 'শেষ নিঃশ্বাস কোথায়',
+        'মৃত্যু হয়েছে কোথায়', 'মারা গেছেন কোথায়', 'ইন্তেকাল কোথায়'
+      ],
       intent: 'location_inquiry',
       emotion: 'serious'
     },
     relationship: {
-      patterns: ['সম্পর্ক কি', 'কিভাবে সম্পর্কিত', 'সংযোগ কি', 'কি সম্পর্ক'],
+      patterns: [
+        'সম্পর্ক কি', 'কিভাবে সম্পর্কিত', 'সংযোগ কি', 'কি সম্পর্ক',
+        'বাবার নাম', 'মায়ের নাম', 'স্ত্রীর নাম', 'স্বামীর নাম',
+        'পরিবার', 'আত্মীয়', 'পারিবারিক'
+      ],
       intent: 'relationship_inquiry',
       emotion: 'curious'
     },
+    time_inquiry: {
+      patterns: [
+        'কখন জন্ম', 'কত সালে জন্ম', 'কোন তারিখে', 'কোন দিন',
+        'কখন মৃত্যু', 'কত সালে মৃত্যু', 'কোন বছর'
+      ],
+      intent: 'time_inquiry',
+      emotion: 'curious'
+    },
     comparison: {
-      patterns: ['তুলনা', 'পার্থক্য কি', 'কোনটা ভালো', 'কোনটা বেশি'],
+      patterns: [
+        'তুলনা', 'পার্থক্য কি', 'কোনটা ভালো', 'কোনটা বেশি',
+        'মধ্যে পার্থক্য', 'কোনটি উত্তম', 'কার চেয়ে'
+      ],
       intent: 'comparison_inquiry',
       emotion: 'analytical'
     },
     explanation: {
-      patterns: ['ব্যাখ্যা', 'কেন এমন', 'কিভাবে সম্ভব', 'কি কারণে'],
+      patterns: [
+        'ব্যাখ্যা', 'কেন এমন', 'কিভাবে সম্ভব', 'কি কারণে',
+        'বিস্তারিত', 'আরও জানতে চাই', 'বুঝিয়ে বলুন'
+      ],
       intent: 'explanation_request',
       emotion: 'curious'
     }
   };
 
-  // Emotional response templates
+  // Enhanced emotional response templates
   private emotionalResponses = {
     positive: {
-      greeting: ['খুব ভালো প্রশ্ন!', 'চমৎকার!', 'দারুণ!'],
+      greeting: ['খুব ভালো প্রশ্ন!', 'চমৎকার!', 'দারুণ!', 'অসাধারণ প্রশ্ন!'],
       helpful: ['আমি আপনাকে সাহায্য করতে পেরে খুশি', 'এটা জানতে পেরে আনন্দিত'],
       encouraging: ['আরও জানুন!', 'চালিয়ে যান!', 'খুব ভালো চিন্তাভাবনা!']
     },
     curious: {
-      questioning: ['আকর্ষণীয় প্রশ্ন!', 'চিন্তাশীল প্রশ্ন!'],
-      exploring: ['আসুন দেখি...', 'চলুন জানি...', 'আবিষ্কার করা যাক...']
+      questioning: ['আকর্ষণীয় প্রশ্ন!', 'চিন্তাশীল প্রশ্ন!', 'গুরুত্বপূর্ণ প্রশ্ন!'],
+      exploring: ['আসুন দেখি...', 'চলুন জানি...', 'আবিষ্কার করা যাক...', 'খুঁজে দেখি...']
     },
     serious: {
       respectful: ['এটা একটা গুরুত্বপূর্ণ বিষয়', 'সম্মানের সাথে বলছি'],
       thoughtful: ['গভীর চিন্তার বিষয়', 'এটা নিয়ে ভাবার মতো']
+    },
+    frustrated: {
+      understanding: ['আমি বুঝতে পারছি আপনার হতাশা', 'আমি আরও ভালো চেষ্টা করব'],
+      supportive: ['আমি আপনাকে সাহায্য করতে চাই', 'একসাথে সমাধান খুঁজব']
     }
   };
 
@@ -114,6 +183,94 @@ class EnhancedAIServiceClass {
     this.updateFuseInstance();
   }
 
+  // Enhanced text normalization with comprehensive word replacement
+  private advancedNormalizeText(text: string): string {
+    let normalized = text.toLowerCase().trim();
+    
+    // Remove punctuation but keep meaningful ones
+    normalized = normalized.replace(/[।,;:!?\-()]/g, ' ');
+    normalized = normalized.replace(/\s+/g, ' ');
+    
+    // Apply comprehensive synonym replacement
+    Object.entries(this.comprehensiveBengaliSynonyms).forEach(([canonical, synonyms]) => {
+      synonyms.forEach(synonym => {
+        const regex = new RegExp(`\\b${this.escapeRegExp(synonym)}\\b`, 'gi');
+        normalized = normalized.replace(regex, canonical);
+      });
+    });
+    
+    console.log('Original text:', text);
+    console.log('Normalized text:', normalized);
+    
+    return normalized;
+  }
+
+  private escapeRegExp(string: string): string {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  // Enhanced question intent analysis
+  private analyzeQuestionIntent(question: string): QuestionIntent {
+    const normalizedQuestion = this.advancedNormalizeText(question);
+    console.log('Analyzing question intent for:', normalizedQuestion);
+    
+    let bestMatch: QuestionIntent = {
+      type: 'general',
+      confidence: 0,
+      keywords: [],
+      normalizedQuery: normalizedQuestion
+    };
+
+    // Check each pattern category
+    Object.entries(this.advancedQuestionPatterns).forEach(([intentType, patternData]) => {
+      let matchScore = 0;
+      const matchedKeywords: string[] = [];
+      
+      patternData.patterns.forEach(pattern => {
+        const normalizedPattern = this.advancedNormalizeText(pattern);
+        
+        // Exact match gets highest score
+        if (normalizedQuestion.includes(normalizedPattern)) {
+          matchScore += 10;
+          matchedKeywords.push(pattern);
+        } else {
+          // Partial word matching
+          const questionWords = normalizedQuestion.split(/\s+/);
+          const patternWords = normalizedPattern.split(/\s+/);
+          
+          let wordMatches = 0;
+          patternWords.forEach(patternWord => {
+            if (questionWords.some(qWord => qWord.includes(patternWord) || patternWord.includes(qWord))) {
+              wordMatches++;
+            }
+          });
+          
+          if (wordMatches > 0) {
+            matchScore += wordMatches * 2;
+            matchedKeywords.push(pattern);
+          }
+        }
+      });
+      
+      const confidence = Math.min(matchScore / 10, 1);
+      
+      console.log(`Intent: ${intentType}, Score: ${matchScore}, Confidence: ${confidence}`);
+      
+      if (confidence > bestMatch.confidence) {
+        bestMatch = {
+          type: intentType as any,
+          confidence,
+          keywords: matchedKeywords,
+          normalizedQuery: normalizedQuestion
+        };
+      }
+    });
+
+    console.log('Best match intent:', bestMatch);
+    return bestMatch;
+  }
+
+  // Keep existing methods but update core functions
   private loadConversationContext() {
     try {
       const stored = localStorage.getItem('ai-conversation-context');
@@ -176,7 +333,7 @@ class EnhancedAIServiceClass {
           { name: 'keywords', weight: 0.1 },
           { name: 'relatedTopics', weight: 0.1 }
         ],
-        threshold: 0.3,
+        threshold: 0.4, // Made more lenient
         includeScore: true,
         includeMatches: true,
         minMatchCharLength: 2,
@@ -199,22 +356,72 @@ class EnhancedAIServiceClass {
     return [...new Set(filteredWords)];
   }
 
+  // Enhanced context-aware search
+  private findBestMatches(question: string): KnowledgeItem[] {
+    console.log('Finding matches for question:', question);
+    
+    if (!this.fuseInstance) {
+      console.log('No fuse instance available');
+      return [];
+    }
+    
+    const normalizedQuestion = this.advancedNormalizeText(question);
+    const questionIntent = this.analyzeQuestionIntent(question);
+    
+    console.log('Normalized question for search:', normalizedQuestion);
+    console.log('Question intent:', questionIntent);
+    
+    // Primary search with normalized question
+    const fuseResults = this.fuseInstance.search(normalizedQuestion);
+    console.log('Fuse search results:', fuseResults);
+    
+    // Secondary search with intent keywords
+    let intentResults: any[] = [];
+    if (questionIntent.keywords.length > 0) {
+      const keywordQuery = questionIntent.keywords.join(' ');
+      const normalizedKeywords = this.advancedNormalizeText(keywordQuery);
+      intentResults = this.fuseInstance.search(normalizedKeywords);
+      console.log('Intent-based search results:', intentResults);
+    }
+    
+    // Combine and deduplicate results
+    const allResults = [...fuseResults, ...intentResults];
+    const uniqueResults = allResults.filter((result, index, arr) => 
+      arr.findIndex(r => r.item.id === result.item.id) === index
+    );
+    
+    // Sort by score and confidence
+    uniqueResults.sort((a, b) => {
+      const aScore = (a.score || 0) - (questionIntent.confidence * 0.1);
+      const bScore = (b.score || 0) - (questionIntent.confidence * 0.1);
+      return aScore - bScore;
+    });
+    
+    console.log('Final search results:', uniqueResults.slice(0, 3));
+    
+    return uniqueResults.slice(0, 3).map(r => r.item);
+  }
+
   // Enhanced emotional intelligence
   private analyzeEmotionalContext(question: string): EmotionalContext {
     const normalizedQuestion = question.toLowerCase();
     
-    // Detect frustration
-    if (normalizedQuestion.includes('কেন বুঝতে পারছ না') || 
+    // Detect frustration with stronger patterns
+    if (normalizedQuestion.includes('বুঝতে পারছ না') || 
         normalizedQuestion.includes('আবার বল') ||
-        normalizedQuestion.includes('ঠিকমতো বল')) {
-      return { sentiment: 'frustrated', confidence: 0.8, suggestedTone: 'encouraging' };
+        normalizedQuestion.includes('ঠিকমতো বল') ||
+        normalizedQuestion.includes('বুজতেই পারতেছেনা') ||
+        normalizedQuestion.includes('সমস্যা') ||
+        normalizedQuestion.includes('ভুল')) {
+      return { sentiment: 'frustrated', confidence: 0.9, suggestedTone: 'encouraging' };
     }
     
     // Detect curiosity
     if (normalizedQuestion.includes('কিভাবে') || 
         normalizedQuestion.includes('কেন') || 
         normalizedQuestion.includes('কি') ||
-        normalizedQuestion.includes('আরও জানতে চাই')) {
+        normalizedQuestion.includes('আরও জানতে চাই') ||
+        normalizedQuestion.includes('জানতে চাই')) {
       return { sentiment: 'curious', confidence: 0.9, suggestedTone: 'informative' };
     }
     
@@ -223,13 +430,6 @@ class EnhancedAIServiceClass {
         normalizedQuestion.includes('ভালো') || 
         normalizedQuestion.includes('দারুণ')) {
       return { sentiment: 'positive', confidence: 0.8, suggestedTone: 'friendly' };
-    }
-    
-    // Detect negative sentiment
-    if (normalizedQuestion.includes('খারাপ') || 
-        normalizedQuestion.includes('সমস্যা') || 
-        normalizedQuestion.includes('ভুল')) {
-      return { sentiment: 'negative', confidence: 0.7, suggestedTone: 'helpful' };
     }
     
     return { sentiment: 'neutral', confidence: 0.6, suggestedTone: 'friendly' };
@@ -392,6 +592,8 @@ class EnhancedAIServiceClass {
   }
 
   async generateResponse(question: string): Promise<string> {
+    console.log('Generating response for question:', question);
+    
     // Update conversation context
     this.conversationContext.previousQuestions.push(question);
     if (this.conversationContext.previousQuestions.length > 10) {
@@ -400,13 +602,16 @@ class EnhancedAIServiceClass {
     
     // Analyze emotional context
     const emotionalContext = this.analyzeEmotionalContext(question);
+    console.log('Emotional context:', emotionalContext);
     
-    // Find relevant knowledge
+    // Find relevant knowledge with enhanced search
     const relevantKnowledge = this.findBestMatches(question);
+    console.log('Relevant knowledge found:', relevantKnowledge.length);
     
     if (relevantKnowledge.length > 0) {
       // Extract facts with enhanced patterns
       const facts = this.extractAdvancedFacts(relevantKnowledge[0].content);
+      console.log('Extracted facts:', facts);
       
       // Generate context-aware response
       const intelligentResponse = this.generateContextAwareResponse(question, facts, emotionalContext);
@@ -446,47 +651,17 @@ class EnhancedAIServiceClass {
     // Emotionally intelligent responses based on context
     switch (emotionalContext.sentiment) {
       case 'frustrated':
-        return "আমি বুঝতে পারছি আপনি হয়তো হতাশ। আমি আরও ভালো করে সাহায্য করার চেষ্টা করব। আপনার প্রশ্নটি আরেকবার ভিন্নভাবে জিজ্ঞেস করুন, অথবা আমাকে এই বিষয়ে কিছু শেখান।";
+        return "আমি বুঝতে পারছি আপনি হয়তো হতাশ। আমি আরও ভালো করে সাহায্য করার চেষ্টা করব। আপনার প্রশ্নটি আরেকবার ভিন্নভাবে জিজ্ঞেস করুন, অথবা আমাকে এই বিষয়ে কিছু শেখান। আমি এখন আরও স্মার্ট এবং আপনার বিভিন্ন ভাষার প্রকাশভঙ্গি বুঝতে পারি।";
         
       case 'curious':
-        return "চমৎকার প্রশ্ন! আমার কাছে এই মুহূর্তে এই বিষয়ে পর্যাপ্ত তথ্য নেই, কিন্তু আপনি চাইলে আমাকে শেখাতে পারেন। আমি এখন আরও স্মার্ট এবং প্রসঙ্গ বুঝে কথা বলতে পারি।";
+        return "চমৎকার প্রশ্ন! আমার কাছে এই মুহূর্তে এই বিষয়ে পর্যাপ্ত তথ্য নেই, কিন্তু আপনি চাইলে আমাকে শেখাতে পারেন। আমি এখন আরও স্মার্ট এবং প্রসঙ্গ বুঝে কথা বলতে পারি। একই প্রশ্ন ভিন্নভাবে করলেও আমি বুঝতে পারি।";
         
       case 'positive':
-        return "আপনার ইতিবাচক মনোভাব দেখে আমি খুশি! আমি এখন আরও উন্নত AI হয়েছি যা আপনার আবেগ ও চাহিদা বুঝতে পারে। আরও কিছু জানতে চাইলে জিজ্ঞেস করুন।";
+        return "আপনার ইতিবাচক মনোভাব দেখে আমি খুশি! আমি এখন আরও উন্নত AI হয়েছি যা আপনার আবেগ ও চাহিদা বুঝতে পারে। প্রশ্ন যেভাবেই করুন না কেন, আমি বুঝে নেওয়ার চেষ্টা করি।";
         
       default:
-        return "আমি আপনার প্রশ্ন বুঝতে পারছি। আমি এখন আরও স্মার্ট এবং প্রসঙ্গ-সচেতন। আপনার আবেগ ও উদ্দেশ্য বুঝে উত্তর দিতে পারি। আরও বিস্তারিত বললে আমি আরও ভালো সাহায্য করতে পারব।";
+        return "আমি আপনার প্রশ্ন বুঝতে পেরেছি। আমি এখন আরও স্মার্ট এবং প্রসঙ্গ-সচেতন। আপনার আবেগ ও উদ্দেশ্য বুঝে উত্তর দিতে পারি। প্রশ্ন ঘুরিয়ে ফিরিয়ে করলেও আমি বুঝে নেওয়ার চেষ্টা করি। আরও বিস্তারিত বললে আমি আরও ভালো সাহায্য করতে পারব।";
     }
-  }
-
-  private findBestMatches(question: string): KnowledgeItem[] {
-    if (!this.fuseInstance) return [];
-    
-    const normalizedQuestion = this.normalizeText(question);
-    const fuseResults = this.fuseInstance.search(normalizedQuestion);
-    
-    // Enhanced matching with context consideration
-    const contextMatches = fuseResults.filter(result => {
-      const currentTopic = this.conversationContext.currentTopic;
-      return !currentTopic || result.item.title.includes(currentTopic) || result.score! < 0.3;
-    });
-    
-    return contextMatches.length > 0 ? 
-      contextMatches.slice(0, 3).map(r => r.item) : 
-      fuseResults.slice(0, 3).map(r => r.item);
-  }
-
-  private normalizeText(text: string): string {
-    let normalized = text.toLowerCase().trim();
-    
-    Object.entries(this.bengaliSynonyms).forEach(([key, synonyms]) => {
-      synonyms.forEach(synonym => {
-        const regex = new RegExp(`\\b${synonym}\\b`, 'g');
-        normalized = normalized.replace(regex, key);
-      });
-    });
-    
-    return normalized;
   }
 
   async learnFromText(title: string, content: string): Promise<void> {
