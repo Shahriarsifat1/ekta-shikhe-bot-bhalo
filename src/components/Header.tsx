@@ -1,52 +1,32 @@
 
-import { MoreVertical } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { AdminPanel } from "./AdminPanel";
+import { Brain, Sparkles } from "lucide-react";
 
 export const Header = () => {
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
-
   return (
-    <>
-      <header className="bg-gradient-to-r from-purple-600 to-purple-700 border-b border-purple-800 sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/20">
-                <img 
-                  src="/lovable-uploads/d4bde19e-2ae2-48fb-8d93-0f4bd9293bf9.png" 
-                  alt="Sofia" 
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div>
-                <h1 className="text-lg font-semibold text-white">
-                  Sofia
-                </h1>
-                <div className="flex items-center space-x-2">
-                  <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
-                  <span className="text-sm text-white/80">Online</span>
-                </div>
-              </div>
+    <header className="bg-white/80 backdrop-blur-md border-b border-white/20 sticky top-0 z-50">
+      <div className="container mx-auto px-4 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <div className="relative">
+              <Brain className="h-8 w-8 text-purple-600" />
+              <Sparkles className="h-4 w-4 text-blue-500 absolute -top-1 -right-1 animate-pulse" />
             </div>
-            
-            <Button
-              onClick={() => setShowAdminPanel(true)}
-              variant="ghost"
-              size="icon"
-              className="text-white hover:bg-white/10"
-            >
-              <MoreVertical className="h-5 w-5" />
-            </Button>
+            <div>
+              <h1 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+                একটা AI বট
+              </h1>
+              <p className="text-xs text-gray-500">Smart Learning Assistant</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="hidden md:flex items-center space-x-2 text-sm text-gray-600">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span>Online & Learning</span>
+            </div>
           </div>
         </div>
-      </header>
-
-      <AdminPanel 
-        isOpen={showAdminPanel} 
-        onClose={() => setShowAdminPanel(false)} 
-      />
-    </>
+      </div>
+    </header>
   );
 };
