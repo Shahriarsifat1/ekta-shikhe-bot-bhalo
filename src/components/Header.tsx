@@ -1,5 +1,5 @@
 
-import { Brain, Sparkles, Settings } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { AdminPanel } from "./AdminPanel";
@@ -31,21 +31,14 @@ export const Header = () => {
               </div>
             </div>
             
-            <div className="flex items-center space-x-2">
-              <Button
-                onClick={() => setShowAdminPanel(true)}
-                variant="ghost"
-                size="icon"
-                className="text-white hover:bg-white/10"
-              >
-                <Settings className="h-5 w-5" />
-              </Button>
-              <div className="w-6 h-6 flex flex-col justify-center space-y-1">
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-                <div className="w-1 h-1 bg-white rounded-full"></div>
-              </div>
-            </div>
+            <Button
+              onClick={() => setShowAdminPanel(true)}
+              variant="ghost"
+              size="icon"
+              className="text-white hover:bg-white/10"
+            >
+              <MoreVertical className="h-5 w-5" />
+            </Button>
           </div>
         </div>
       </header>
