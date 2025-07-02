@@ -5,14 +5,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { BookOpen, Brain, Upload } from "lucide-react";
+import { BookOpen, Brain, Upload, MessageSquare, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AIService } from "@/services/AIService";
 
 export const LearningInterface = () => {
   const [content, setContent] = useState("");
   const [title, setTitle] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
   const [isLearning, setIsLearning] = useState(false);
+  const [isAddingQA, setIsAddingQA] = useState(false);
   const { toast } = useToast();
 
   const handleLearnFromText = async () => {
@@ -49,8 +52,94 @@ export const LearningInterface = () => {
     }
   };
 
+  const handleAddQuestionAnswer = async () => {
+    if (!question.trim() || !answer.trim()) {
+      toast({
+        title: "অনুপস্থিত তথ্য",
+        description: "প্রশ্ন এবং উত্তর দুটোই প্রদান করুন।",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAddingQA(true);
+
+    try {
+      await AIService.addQuestionAnswer(question, answer);
+      
+      toast({
+        title: "সফল!",
+        description: "প্রশ্ন-উত্তর সফলভাবে যোগ করা হয়েছে।",
+      });
+      
+      setQuestion("");
+      setAnswer("");
+    } catch (error) {
+      console.error("Error adding Q&A:", error);
+      toast({
+        title: "ব্যর্থ",
+        description: "কিছু সমস্যা হয়েছে। আবার চেষ্টা করুন।",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAddingQA(false);
+    }
+  };
+
   return (
     <div className="grid gap-6">
+      {/* Question-Answer Section */}
+      <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <MessageSquare className="h-6 w-6 text-blue-600" />
+            <span>প্রশ্ন-উত্তর যোগ করুন</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label htmlFor="question">প্রশ্ন</Label>
+            <Input
+              id="question"
+              value={question}
+              onChange={(e) => setQuestion(e.target.value)}
+              placeholder="যেমন: কেমন আছো?"
+              className="mt-1"
+            />
+          </div>
+          
+          <div>
+            <Label htmlFor="answer">উত্তর</Label>
+            <Textarea
+              id="answer"
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              placeholder="যেমন: আমি ভালো আছি।"
+              className="mt-1 min-h-[100px]"
+            />
+          </div>
+          
+          <Button
+            onClick={handleAddQuestionAnswer}
+            disabled={isAddingQA || !question.trim() || !answer.trim()}
+            className="w-full bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600"
+          >
+            {isAddingQA ? (
+              <>
+                <Brain className="mr-2 h-4 w-4 animate-spin" />
+                যোগ করছি...
+              </>
+            ) : (
+              <>
+                <MessageSquare className="mr-2 h-4 w-4" />
+                প্রশ্ন-উত্তর যোগ করুন
+              </>
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Text Learning Section */}
       <Card className="bg-white/90 backdrop-blur-sm border-0 shadow-xl">
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -101,11 +190,23 @@ export const LearningInterface = () => {
         </CardContent>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-3 gap-6">
         <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-0">
           <CardContent className="p-6">
             <div className="text-center">
-              <BookOpen className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <MessageSquare className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">সরাসরি Q&A</h3>
+              <p className="text-sm text-gray-600">
+                নির্দিষ্ট প্রশ্নের জন্য সরাসরি উত্তর সেট করুন
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-0">
+          <CardContent className="p-6">
+            <div className="text-center">
+              <BookOpen className="h-12 w-12 text-green-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">টেক্সট বিশ্লেষণ</h3>
               <p className="text-sm text-gray-600">
                 AI বট যেকোনো প্যারাগ্রাফ বিশ্লেষণ করে মূল তথ্যগুলো সংরক্ষণ করে

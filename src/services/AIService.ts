@@ -9,9 +9,19 @@ interface KnowledgeItem {
   keywords: string[]; // নতুন field
 }
 
+interface QuestionAnswerPair {
+  id: string;
+  question: string;
+  answer: string;
+  timestamp: Date;
+  keywords: string[];
+}
+
 class AIServiceClass {
   private knowledgeBase: KnowledgeItem[] = [];
+  private questionAnswerPairs: QuestionAnswerPair[] = [];
   private fuseInstance: Fuse<KnowledgeItem> | null = null;
+  private qaPairsFuse: Fuse<QuestionAnswerPair> | null = null;
 
   // Enhanced Bengali to English mapping and synonyms
   private bengaliSynonyms: Record<string, string[]> = {
@@ -31,14 +41,10 @@ class AIServiceClass {
     'নেয়': ['নেওয়া', 'নিয়া', 'নিল'],
     'আছে': ['আছিল', 'থাকে', 'রয়েছে'],
     'ছিল': ['ছিলো', 'ছাইল', 'আছিল'],
-    'মৃত্যুবরণ': ['মারা যান', 'মৃত্যু', 'মরে যান', 'ইন্তেকাল'],
-    'জন্মগ্রহণ': ['জন্ম', 'জন্মায়', 'জন্মেছিলেন'],
-    'গ্রাম': ['গ্রামে', 'পল্লী', 'পল্লীতে'],
-    'নাম': ['নামধারী', 'নামক', 'নামের'],
-    'বাবা': ['পিতা', 'পিতার', 'বাবার'],
-    'মা': ['মাতা', 'মায়ের', 'মাতার'],
-    'মেয়ে': ['কন্যা', 'কন্যার', 'মেয়ের'],
-    'ছেলে': ['পুত্র', 'পুত্রের', 'ছেলের']
+    'কেমন': ['কিরূপ', 'কি অবস্থা', 'কেমন আছো', 'কেমন আছেন'],
+    'আছো': ['আছেন', 'আছ', 'থাকো'],
+    'ভালো': ['ভাল', 'সুন্দর', 'চমৎকার'],
+    'খারাপ': ['খারাপ', 'মন্দ', 'বাজে']
   };
 
   // Enhanced question patterns for better understanding
@@ -49,7 +55,8 @@ class AIServiceClass {
     what: ['কি', 'কী', 'কোন জিনিস'],
     who: ['কে', 'কার', 'কোন ব্যক্তি'],
     how: ['কিভাবে', 'কেমনে', 'কোন উপায়ে'],
-    why: ['কেন', 'কিসের জন্য', 'কোন কারণে']
+    why: ['কেন', 'কিসের জন্য', 'কোন কারণে'],
+    state: ['কেমন', 'কি অবস্থা', 'কেমন আছো', 'কেমন আছেন']
   };
 
   // Relationship mapping
@@ -62,7 +69,9 @@ class AIServiceClass {
 
   constructor() {
     this.loadKnowledgeFromStorage();
+    this.loadQuestionAnswersFromStorage();
     this.updateFuseInstance();
+    this.updateQAFuseInstance();
   }
 
   private loadKnowledgeFromStorage() {
@@ -81,11 +90,35 @@ class AIServiceClass {
     }
   }
 
+  private loadQuestionAnswersFromStorage() {
+    try {
+      const stored = localStorage.getItem('ai-question-answers');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        this.questionAnswerPairs = parsed.map((item: any) => ({
+          ...item,
+          timestamp: new Date(item.timestamp),
+          keywords: item.keywords || this.extractKeywords(item.question)
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading question-answers:', error);
+    }
+  }
+
   private saveKnowledgeToStorage() {
     try {
       localStorage.setItem('ai-knowledge-base', JSON.stringify(this.knowledgeBase));
     } catch (error) {
       console.error('Error saving knowledge base:', error);
+    }
+  }
+
+  private saveQuestionAnswersToStorage() {
+    try {
+      localStorage.setItem('ai-question-answers', JSON.stringify(this.questionAnswerPairs));
+    } catch (error) {
+      console.error('Error saving question-answers:', error);
     }
   }
 
@@ -127,6 +160,24 @@ class AIServiceClass {
     }
   }
 
+  private updateQAFuseInstance() {
+    if (this.questionAnswerPairs.length > 0) {
+      const options = {
+        keys: [
+          { name: 'question', weight: 0.7 },
+          { name: 'keywords', weight: 0.3 }
+        ],
+        threshold: 0.3,
+        includeScore: true,
+        includeMatches: true,
+        minMatchCharLength: 2,
+        ignoreLocation: true
+      };
+      
+      this.qaPairsFuse = new Fuse(this.questionAnswerPairs, options);
+    }
+  }
+
   private normalizeText(text: string): string {
     let normalized = text.toLowerCase().trim();
     
@@ -141,7 +192,54 @@ class AIServiceClass {
     return normalized;
   }
 
-  // New enhanced question analysis method
+  private findMatchingQuestionAnswer(question: string): string | null {
+    const normalizedQuestion = this.normalizeText(question);
+    
+    console.log('Searching for Q&A match:', normalizedQuestion);
+    
+    // First try exact match
+    for (const qaPair of this.questionAnswerPairs) {
+      const normalizedStoredQuestion = this.normalizeText(qaPair.question);
+      if (normalizedStoredQuestion === normalizedQuestion) {
+        console.log('Found exact match:', qaPair);
+        return qaPair.answer;
+      }
+    }
+    
+    // Then try fuzzy search
+    if (this.qaPairsFuse) {
+      const fuseResults = this.qaPairsFuse.search(normalizedQuestion);
+      console.log('Fuzzy search results:', fuseResults);
+      
+      if (fuseResults.length > 0 && fuseResults[0].score! < 0.4) {
+        console.log('Found fuzzy match:', fuseResults[0]);
+        return fuseResults[0].item.answer;
+      }
+    }
+    
+    // Try keyword-based matching
+    const questionWords = normalizedQuestion.split(/\s+/).filter(word => word.length > 2);
+    
+    for (const qaPair of this.questionAnswerPairs) {
+      const qaPairWords = this.normalizeText(qaPair.question).split(/\s+/);
+      let matchCount = 0;
+      
+      for (const word of questionWords) {
+        if (qaPairWords.includes(word)) {
+          matchCount++;
+        }
+      }
+      
+      // If more than 60% words match
+      if (matchCount >= questionWords.length * 0.6 && matchCount > 0) {
+        console.log('Found keyword match:', qaPair, 'Match ratio:', matchCount / questionWords.length);
+        return qaPair.answer;
+      }
+    }
+    
+    return null;
+  }
+
   private extractSpecificAnswer(question: string, content: string): string {
     const normalizedQuestion = this.normalizeText(question);
     const normalizedContent = this.normalizeText(content);
@@ -482,9 +580,34 @@ class AIServiceClass {
     console.log('Learned new knowledge with keywords:', newKnowledge);
   }
 
+  async addQuestionAnswer(question: string, answer: string): Promise<void> {
+    const keywords = this.extractKeywords(question);
+    const newQAPair: QuestionAnswerPair = {
+      id: Date.now().toString(),
+      question: question.trim(),
+      answer: answer.trim(),
+      timestamp: new Date(),
+      keywords: keywords
+    };
+
+    this.questionAnswerPairs.push(newQAPair);
+    this.saveQuestionAnswersToStorage();
+    this.updateQAFuseInstance();
+    
+    console.log('Added new Q&A pair:', newQAPair);
+  }
+
   async generateResponse(question: string): Promise<string> {
     const normalizedQuestion = this.normalizeText(question);
     
+    // First check for direct Q&A matches
+    const directAnswer = this.findMatchingQuestionAnswer(question);
+    if (directAnswer) {
+      console.log('Found direct Q&A match');
+      return directAnswer;
+    }
+    
+    // Then try knowledge base
     const relevantKnowledge = this.findBestMatches(question);
     
     console.log('Found relevant knowledge:', relevantKnowledge.length);
@@ -588,10 +711,20 @@ class AIServiceClass {
     return [...this.knowledgeBase].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
   }
 
+  getQuestionAnswerPairs(): QuestionAnswerPair[] {
+    return [...this.questionAnswerPairs].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+  }
+
   deleteKnowledge(id: string): void {
     this.knowledgeBase = this.knowledgeBase.filter(item => item.id !== id);
     this.saveKnowledgeToStorage();
     this.updateFuseInstance();
+  }
+
+  deleteQuestionAnswer(id: string): void {
+    this.questionAnswerPairs = this.questionAnswerPairs.filter(item => item.id !== id);
+    this.saveQuestionAnswersToStorage();
+    this.updateQAFuseInstance();
   }
 
   clearKnowledgeBase(): void {
@@ -600,10 +733,17 @@ class AIServiceClass {
     this.updateFuseInstance();
   }
 
-  getKnowledgeStats(): { total: number; topics: string[] } {
+  clearQuestionAnswers(): void {
+    this.questionAnswerPairs = [];
+    this.saveQuestionAnswersToStorage();
+    this.updateQAFuseInstance();
+  }
+
+  getKnowledgeStats(): { total: number; topics: string[]; qaPairs: number } {
     return {
       total: this.knowledgeBase.length,
-      topics: [...new Set(this.knowledgeBase.map(item => item.title))]
+      topics: [...new Set(this.knowledgeBase.map(item => item.title))],
+      qaPairs: this.questionAnswerPairs.length
     };
   }
 }
