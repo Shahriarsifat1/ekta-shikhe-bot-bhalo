@@ -6,12 +6,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Send, Bot, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { AIService } from "@/services/AIService";
+import { TypewriterText } from "./TypewriterText";
 
 interface Message {
   id: string;
   type: "user" | "bot";
   content: string;
   timestamp: Date;
+  isAnimating?: boolean;
 }
 
 export const ChatInterface = () => {
@@ -57,7 +59,8 @@ export const ChatInterface = () => {
         id: (Date.now() + 1).toString(),
         type: "bot",
         content: response,
-        timestamp: new Date()
+        timestamp: new Date(),
+        isAnimating: true
       };
 
       setMessages(prev => [...prev, botMessage]);
@@ -103,14 +106,32 @@ export const ChatInterface = () => {
                 >
                   {message.type === "user" ? <User size={16} /> : <Bot size={16} />}
                 </div>
-                <div
-                  className={`rounded-lg p-3 ${
-                    message.type === "user"
-                      ? "bg-blue-500 text-white"
-                      : "bg-gray-100 text-gray-800"
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
+                 <div
+                   className={`rounded-lg p-3 ${
+                     message.type === "user"
+                       ? "bg-blue-500 text-white"
+                       : "bg-gray-100 text-gray-800"
+                   }`}
+                 >
+                   <p className="text-sm">
+                     {message.type === "bot" && message.isAnimating ? (
+                       <TypewriterText 
+                         text={message.content} 
+                         speed={30}
+                         onComplete={() => {
+                           setMessages(prev => 
+                             prev.map(msg => 
+                               msg.id === message.id 
+                                 ? { ...msg, isAnimating: false }
+                                 : msg
+                             )
+                           );
+                         }}
+                       />
+                     ) : (
+                       message.content
+                     )}
+                   </p>
                   <p className={`text-xs mt-1 ${
                     message.type === "user" ? "text-blue-100" : "text-gray-500"
                   }`}>
