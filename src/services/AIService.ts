@@ -17,6 +17,158 @@ interface QuestionAnswerPair {
   keywords: string[];
 }
 
+// Advanced similarity calculation utilities
+class SimilarityCalculator {
+  // TF-IDF calculation
+  static calculateTFIDF(text: string, document: string, corpus: string[]): number {
+    const words = text.toLowerCase().split(/\s+/);
+    const docWords = document.toLowerCase().split(/\s+/);
+    const totalDocs = corpus.length;
+    
+    let tfidfScore = 0;
+    
+    words.forEach(word => {
+      // Term Frequency (TF)
+      const tf = docWords.filter(w => w === word).length / docWords.length;
+      
+      // Inverse Document Frequency (IDF)
+      const docsWithTerm = corpus.filter(doc => 
+        doc.toLowerCase().includes(word)
+      ).length;
+      const idf = Math.log(totalDocs / (docsWithTerm + 1));
+      
+      tfidfScore += tf * idf;
+    });
+    
+    return tfidfScore;
+  }
+  
+  // Cosine Similarity
+  static cosineSimilarity(text1: string, text2: string): number {
+    const words1 = text1.toLowerCase().split(/\s+/);
+    const words2 = text2.toLowerCase().split(/\s+/);
+    
+    const allWords = [...new Set([...words1, ...words2])];
+    
+    const vector1 = allWords.map(word => words1.filter(w => w === word).length);
+    const vector2 = allWords.map(word => words2.filter(w => w === word).length);
+    
+    const dotProduct = vector1.reduce((sum, val, i) => sum + val * vector2[i], 0);
+    const magnitude1 = Math.sqrt(vector1.reduce((sum, val) => sum + val * val, 0));
+    const magnitude2 = Math.sqrt(vector2.reduce((sum, val) => sum + val * val, 0));
+    
+    if (magnitude1 === 0 || magnitude2 === 0) return 0;
+    
+    return dotProduct / (magnitude1 * magnitude2);
+  }
+  
+  // Levenshtein Distance (normalized)
+  static levenshteinSimilarity(str1: string, str2: string): number {
+    const matrix = [];
+    const len1 = str1.length;
+    const len2 = str2.length;
+    
+    for (let i = 0; i <= len2; i++) {
+      matrix[i] = [i];
+    }
+    
+    for (let j = 0; j <= len1; j++) {
+      matrix[0][j] = j;
+    }
+    
+    for (let i = 1; i <= len2; i++) {
+      for (let j = 1; j <= len1; j++) {
+        if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+          matrix[i][j] = matrix[i - 1][j - 1];
+        } else {
+          matrix[i][j] = Math.min(
+            matrix[i - 1][j - 1] + 1,
+            matrix[i][j - 1] + 1,
+            matrix[i - 1][j] + 1
+          );
+        }
+      }
+    }
+    
+    const maxLen = Math.max(len1, len2);
+    return maxLen === 0 ? 1 : 1 - (matrix[len2][len1] / maxLen);
+  }
+  
+  // Jaccard Index
+  static jaccardSimilarity(text1: string, text2: string): number {
+    const set1 = new Set(text1.toLowerCase().split(/\s+/));
+    const set2 = new Set(text2.toLowerCase().split(/\s+/));
+    
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+    
+    return union.size === 0 ? 0 : intersection.size / union.size;
+  }
+  
+  // Partial Matching (substring matching with weights)
+  static partialMatching(query: string, text: string): number {
+    const queryWords = query.toLowerCase().split(/\s+/);
+    const textLower = text.toLowerCase();
+    
+    let matches = 0;
+    let totalWeight = 0;
+    
+    queryWords.forEach(word => {
+      const weight = word.length; // Longer words have more weight
+      totalWeight += weight;
+      
+      if (textLower.includes(word)) {
+        matches += weight;
+      } else {
+        // Check for partial matches (minimum 3 characters)
+        if (word.length >= 3) {
+          for (let i = 0; i <= word.length - 3; i++) {
+            const substring = word.substring(i, i + 3);
+            if (textLower.includes(substring)) {
+              matches += weight * 0.3; // Partial match gets 30% weight
+              break;
+            }
+          }
+        }
+      }
+    });
+    
+    return totalWeight === 0 ? 0 : matches / totalWeight;
+  }
+  
+  // Combined similarity score using all algorithms
+  static combinedSimilarity(query: string, text: string, corpus: string[] = []): number {
+    const cosine = this.cosineSimilarity(query, text);
+    const levenshtein = this.levenshteinSimilarity(query, text);
+    const jaccard = this.jaccardSimilarity(query, text);
+    const partial = this.partialMatching(query, text);
+    
+    let tfidf = 0;
+    if (corpus.length > 0) {
+      tfidf = this.calculateTFIDF(query, text, corpus);
+      // Normalize TF-IDF score to 0-1 range
+      tfidf = Math.min(1, tfidf / 2);
+    }
+    
+    // Weighted combination of all similarity scores
+    const weights = {
+      cosine: 0.25,
+      levenshtein: 0.2,
+      jaccard: 0.2,
+      partial: 0.25,
+      tfidf: 0.1
+    };
+    
+    return (
+      cosine * weights.cosine +
+      levenshtein * weights.levenshtein +
+      jaccard * weights.jaccard +
+      partial * weights.partial +
+      tfidf * weights.tfidf
+    );
+  }
+}
+
 class AIServiceClass {
   private knowledgeBase: KnowledgeItem[] = [];
   private questionAnswerPairs: QuestionAnswerPair[] = [];
@@ -195,7 +347,7 @@ class AIServiceClass {
   private findMatchingQuestionAnswer(question: string): string | null {
     const normalizedQuestion = this.normalizeText(question);
     
-    console.log('Searching for Q&A match:', normalizedQuestion);
+    console.log('Searching for Q&A match using advanced algorithms:', normalizedQuestion);
     
     // First try exact match
     for (const qaPair of this.questionAnswerPairs) {
@@ -206,7 +358,54 @@ class AIServiceClass {
       }
     }
     
-    // Then try fuzzy search
+    // Then try advanced similarity algorithms
+    const corpus = this.questionAnswerPairs.map(qaPair => qaPair.question);
+    const similarityResults: Array<{qaPair: QuestionAnswerPair, score: number, algorithm: string}> = [];
+    
+    for (const qaPair of this.questionAnswerPairs) {
+      const normalizedStoredQuestion = this.normalizeText(qaPair.question);
+      
+      // Calculate combined similarity using all algorithms
+      const combinedScore = SimilarityCalculator.combinedSimilarity(
+        normalizedQuestion, 
+        normalizedStoredQuestion, 
+        corpus
+      );
+      
+      // Individual algorithm scores for debugging
+      const cosineScore = SimilarityCalculator.cosineSimilarity(normalizedQuestion, normalizedStoredQuestion);
+      const levenshteinScore = SimilarityCalculator.levenshteinSimilarity(normalizedQuestion, normalizedStoredQuestion);
+      const jaccardScore = SimilarityCalculator.jaccardSimilarity(normalizedQuestion, normalizedStoredQuestion);
+      const partialScore = SimilarityCalculator.partialMatching(normalizedQuestion, normalizedStoredQuestion);
+      const tfidfScore = SimilarityCalculator.calculateTFIDF(normalizedQuestion, normalizedStoredQuestion, corpus);
+      
+      console.log(`Advanced similarity scores for "${qaPair.question}":`, {
+        combined: combinedScore,
+        cosine: cosineScore,
+        levenshtein: levenshteinScore,
+        jaccard: jaccardScore,
+        partial: partialScore,
+        tfidf: Math.min(1, tfidfScore / 2)
+      });
+      
+      if (combinedScore > 0.5) { // Threshold for good match
+        similarityResults.push({
+          qaPair,
+          score: combinedScore,
+          algorithm: 'combined'
+        });
+      }
+    }
+    
+    // Sort by similarity score (highest first)
+    similarityResults.sort((a, b) => b.score - a.score);
+    
+    if (similarityResults.length > 0) {
+      console.log('Found advanced similarity match:', similarityResults[0]);
+      return similarityResults[0].qaPair.answer;
+    }
+    
+    // Fallback to Fuse.js fuzzy search
     if (this.qaPairsFuse) {
       const fuseResults = this.qaPairsFuse.search(normalizedQuestion);
       console.log('Fuzzy search results:', fuseResults);
@@ -217,7 +416,7 @@ class AIServiceClass {
       }
     }
     
-    // Try keyword-based matching
+    // Final fallback to keyword-based matching
     const questionWords = normalizedQuestion.split(/\s+/).filter(word => word.length > 2);
     
     for (const qaPair of this.questionAnswerPairs) {
