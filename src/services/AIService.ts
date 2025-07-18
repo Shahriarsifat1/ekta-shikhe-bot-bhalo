@@ -1,4 +1,5 @@
 import Fuse from 'fuse.js';
+import { WikipediaService } from './WikipediaService';
 
 interface KnowledgeItem {
   id: string;
@@ -831,6 +832,30 @@ class AIServiceClass {
       return this.generateSmartResponse(question, relevantKnowledge);
     }
 
+    // If no local knowledge found, try Wikipedia
+    console.log('No local knowledge found, searching Wikipedia...');
+    try {
+      const wikipediaContent = await WikipediaService.getRelevantContent(question);
+      
+      if (wikipediaContent && wikipediaContent.length > 0) {
+        console.log('Found Wikipedia content:', wikipediaContent.substring(0, 100));
+        
+        // Try to extract specific answer from Wikipedia content
+        const wikipediaAnswer = this.extractSpecificAnswer(question, wikipediaContent);
+        
+        if (wikipediaAnswer && !wikipediaAnswer.includes('দুঃখিত')) {
+          return wikipediaAnswer;
+        }
+        
+        // If no specific answer, return the Wikipedia content with formatting
+        return wikipediaContent.length > 500 
+          ? wikipediaContent.substring(0, 500) + '...\n\n[সূত্র: উইকিপিডিয়া]'
+          : wikipediaContent + '\n\n[সূত্র: উইকিপিডিয়া]';
+      }
+    } catch (error) {
+      console.error('Error fetching Wikipedia content:', error);
+    }
+
     return this.generateGeneralResponse(question);
   }
 
@@ -885,7 +910,7 @@ class AIServiceClass {
     const thanks = ['ধন্যবাদ', 'থ্যাংক', 'thanks', 'thank you'];
     
     if (greetings.some(greeting => question.toLowerCase().includes(greeting))) {
-      return "নমস্কার! আমি একটা স্মার্ট AI বট। আপনি আমাকে যেকোনো প্রশ্ন করতে পারেন অথবা নতুন কিছু শেখাতে পারেন।";
+      return "নমস্কার! আমি একটা স্মার্ট AI বট। আপনি আমাকে যেকোনো প্রশ্ন করতে পারেন অথবা নতুন কিছু শেখাতে পারেন। আমি এখন উইকিপিডিয়া থেকেও তথ্য খুঁজে এনে উত্তর দিতে পারি।";
     }
     
     if (thanks.some(thank => question.toLowerCase().includes(thank))) {
@@ -893,14 +918,14 @@ class AIServiceClass {
     }
 
     if (question.includes('?') || question.includes('কী') || question.includes('কিভাবে') || question.includes('কেন')) {
-      return `এটি একটি আকর্ষণীয় প্রশ্ন! দুঃখিত, আমার কাছে এই বিষয়ে এখনো পর্যাপ্ত তথ্য নেই। আপনি চাইলে আমাকে এই বিষয়ে কিছু শেখাতে পারেন "শেখান" ট্যাবে গিয়ে। আমি এখন আরও স্মার্ট হয়েছি এবং সরাসরি উত্তর দিতে পারি।`;
+      return `এটি একটি আকর্ষণীয় প্রশ্ন! দুঃখিত, আমার কাছে এই বিষয়ে এখনো পর্যাপ্ত তথ্য নেই। আমি উইকিপিডিয়া থেকে খোঁজার চেষ্টা করেছি কিন্তু কিছু পাইনি। আপনি চাইলে আমাকে এই বিষয়ে কিছু শেখাতে পারেন "শেখান" ট্যাবে গিয়ে।`;
     }
 
     const generalResponses = [
-      "আমি আপনার কথা বুঝতে পারছি। আমি এখন ChatGPT ও Gemini এর মতো স্মার্ট হয়েছি এবং সংক্ষিপ্ত, সঠিক উত্তর দিতে পারি।",
-      "আকর্ষণীয়! আপনি চাইলে আমাকে এই বিষয়ে আরও শেখাতে পারেন। আমি এখন প্রসঙ্গ বুঝে নির্দিষ্ট উত্তর দিতে পারি।",
-      "আমি প্রতিদিন নতুন কিছু শিখছি এবং আরও বুদ্ধিমান হচ্ছি। এখন আমি প্রশ্নের মূল অর্থ বুঝে সরাসরি উত্তর দিতে পারি।",
-      "আমি আপনাকে সাহায্য করতে চাই। আমার নতুন AI ক্ষমতা দিয়ে আমি সংক্ষিপ্ত এবং নির্ভুল উত্তর দিতে পারব।"
+      "আমি আপনার কথা বুঝতে পারছি। আমি এখন ChatGPT ও Gemini এর মতো স্মার্ট হয়েছি এবং উইকিপিডিয়া থেকে তথ্য এনে সংক্ষিপ্ত, সঠিক উত্তর দিতে পারি।",
+      "আকর্ষণীয়! আপনি চাইলে আমাকে এই বিষয়ে আরও শেখাতে পারেন। আমি এখন প্রসঙ্গ বুঝে নির্দিষ্ট উত্তর দিতে পারি এবং উইকিপিডিয়া থেকেও তথ্য খুঁজে আনতে পারি।",
+      "আমি প্রতিদিন নতুন কিছু শিখছি এবং আরও বুদ্ধিমান হচ্ছি। এখন আমি প্রশ্নের মূল অর্থ বুঝে সরাসরি উত্তর দিতে পারি এবং প্রয়োজনে উইকিপিডিয়া থেকে তথ্য সংগ্রহ করতে পারি।",
+      "আমি আপনাকে সাহায্য করতে চাই। আমার নতুন AI ক্ষমতা দিয়ে আমি সংক্ষিপ্ত এবং নির্ভুল উত্তর দিতে পারব, এবং উইকিপিডিয়া থেকেও তথ্য এনে দিতে পারি।"
     ];
 
     return generalResponses[Math.floor(Math.random() * generalResponses.length)];
